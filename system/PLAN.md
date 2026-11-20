@@ -3,11 +3,12 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 
 ## Phase 0 — Foundations
 - [x] Create branch `feature/returnright`; add CLAUDE.md, LLD.md, PLAN.md
-- [ ] Gradle multi-module: settings include `gateway-api`, `gateway-mock`; portal `implementation project(':gateway-api')`, `runtimeOnly project(':gateway-mock')`
-- [ ] Dependencies: remove thymeleaf; add springdoc-openapi-starter-webmvc-ui, spring-modulith (core + test) — verify Boot 4 compatibility, fallback ArchUnit
-- [ ] Profiles: `local` (H2 file), `test` (H2 mem, MODE=PostgreSQL), `docker` (Postgres); `app.*` properties (storage dir, label secret, thresholds)
-- [ ] `shared`: DomainException, ErrorCode, GlobalExceptionHandler (ProblemDetail), Clock bean, Money util
-- [ ] Verify: context-loads test, ModularityTest, `build` green
+- [x] Gradle multi-module: settings include `gateway-api`, `gateway-mock`; portal `implementation project(':gateway-api')`, `runtimeOnly project(':gateway-mock')`
+- [x] Dependencies: remove thymeleaf; add springdoc-openapi-starter-webmvc-ui, spring-modulith (core + test) — verify Boot 4 compatibility, fallback ArchUnit
+  (springdoc 3.2.0 + Spring Modulith 2.2.0 work on Boot 4.2.0; no fallback needed)
+- [x] Profiles: `local` (H2 file), `test` (H2 mem, MODE=PostgreSQL), `docker` (Postgres); `app.*` properties (storage dir, label secret, thresholds)
+- [x] `shared`: DomainException, ErrorCode, GlobalExceptionHandler (ProblemDetail), Clock bean, Money util
+- [x] Verify: context-loads test, ModularityTest, `build` green
 
 ## Phase 1 — Architecture docs
 - [ ] docs/architecture.md: C4 context + container diagrams (Mermaid), state machine diagram

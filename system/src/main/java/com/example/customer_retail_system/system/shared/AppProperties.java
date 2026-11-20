@@ -1,0 +1,50 @@
+package com.example.customer_retail_system.system.shared;
+
+import java.time.ZoneId;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+/**
+ * Typed {@code app.*} settings. Business thresholds live here so nothing is hard-coded.
+ */
+@Validated
+@ConfigurationProperties(prefix = "app")
+public record AppProperties(
+		@NotNull ZoneId zone,
+		@Valid @NotNull Storage storage,
+		@Valid @NotNull Label label,
+		@Valid @NotNull Returns returns,
+		@Valid @NotNull Refund refund,
+		@Valid @NotNull Flagging flagging,
+		@Valid @NotNull Seed seed) {
+
+	/** Where uploaded photos are stored (server-generated names only). */
+	public record Storage(@NotBlank String dir) {
+	}
+
+	/** HMAC secret used to sign return label codes. */
+	public record Label(@NotBlank String secret) {
+	}
+
+	/** Default return window when a category does not override it. */
+	public record Returns(@Positive int defaultWindowDays) {
+	}
+
+	/** Refund totals strictly greater than this need finance approval. */
+	public record Refund(@Positive long approvalThresholdPaise) {
+	}
+
+	/** More than {@code maxRequests} return requests within {@code windowDays} flags a customer. */
+	public record Flagging(@Positive int maxRequests, @Positive int windowDays) {
+	}
+
+	/** Deterministic seed-data settings (used only by the {@code seed} profile). */
+	public record Seed(long randomSeed, @NotBlank String staffPassword) {
+	}
+}

@@ -1,5 +1,7 @@
 HELP.md
 .gradle
+# local H2 database and uploaded photos (local profile)
+data/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
