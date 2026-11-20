@@ -38,7 +38,7 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
   (+ `audit_log` and `rma_number_seq`, needed by Phase 4 audit and RMA numbers)
 - [x] audit module + AuditLog (same-tx)
 - [x] ReturnStateMachine + transition-table test (every legal/illegal pair)
-- [ ] Photo storage (magic bytes, size, UUID names)
+- [x] Photo storage (magic bytes, size, UUID names)
 - [ ] Create return (order lock, Idempotency-Key replay, flagging, auto-approve vs PENDING_REVIEW)
 - [ ] Label code HMAC + QR PNG (ZXing); timeline endpoint; ship; cancel
 - [ ] Tests: mixed basket with an ineligible item → 422 with reasons; 4th return in 30 days → flagged; concurrent create over-return prevented; replay same key → same RMA; audit row per transition
