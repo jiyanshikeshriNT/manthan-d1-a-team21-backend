@@ -5,12 +5,14 @@ import java.util.List;
 import java.util.Map;
 
 import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.CreateReturnRequest;
+import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.LabelDto;
 import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.ReturnDto;
 import com.example.customer_retail_system.system.shared.CustomerPrincipal;
 import com.example.customer_retail_system.system.shared.DomainException;
 import com.example.customer_retail_system.system.shared.ErrorCode;
 import jakarta.validation.Valid;
 
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -55,9 +57,33 @@ class CustomerReturnController {
 		return response.body(outcome.body());
 	}
 
+	/** Status and timeline [{step, state: done/current/pending/failed, at, note}]. */
 	@GetMapping("/{rma}")
 	ReturnDto get(@AuthenticationPrincipal CustomerPrincipal principal, @PathVariable String rma) {
 		return service.get(principal, rma);
+	}
+
+	@GetMapping("/{rma}/label")
+	LabelDto label(@AuthenticationPrincipal CustomerPrincipal principal, @PathVariable String rma) {
+		return service.label(principal, rma);
+	}
+
+	@GetMapping(value = "/{rma}/label/qr.png", produces = MediaType.IMAGE_PNG_VALUE)
+	ResponseEntity<byte[]> labelQr(@AuthenticationPrincipal CustomerPrincipal principal, @PathVariable String rma) {
+		return ResponseEntity.ok()
+				.contentType(MediaType.IMAGE_PNG)
+				.cacheControl(CacheControl.noStore())
+				.body(service.labelQrPng(principal, rma));
+	}
+
+	@PostMapping("/{rma}/ship")
+	ReturnDto ship(@AuthenticationPrincipal CustomerPrincipal principal, @PathVariable String rma) {
+		return service.ship(principal, rma);
+	}
+
+	@PostMapping("/{rma}/cancel")
+	ReturnDto cancel(@AuthenticationPrincipal CustomerPrincipal principal, @PathVariable String rma) {
+		return service.cancel(principal, rma);
 	}
 
 	private static Map<Long, List<MultipartFile>> photoParts(MultipartHttpServletRequest multipart) {

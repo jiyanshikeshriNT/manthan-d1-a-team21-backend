@@ -42,7 +42,7 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 - [x] Create return (order lock, Idempotency-Key replay, flagging, auto-approve vs PENDING_REVIEW)
   (response carries labelCode + timeline per LLD §4, so LabelCodec and the timeline builder land here;
   the concurrency test was confirmed to fail with the order lock removed)
-- [ ] Label code HMAC + QR PNG (ZXing); timeline endpoint; ship; cancel
+- [x] Label code HMAC + QR PNG (ZXing); timeline endpoint; ship; cancel
 - [ ] Tests: mixed basket with an ineligible item → 422 with reasons; 4th return in 30 days → flagged; concurrent create over-return prevented; replay same key → same RMA; audit row per transition
 
 ## Phase 5 — Warehouse inspection

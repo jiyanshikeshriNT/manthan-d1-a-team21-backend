@@ -27,6 +27,7 @@ import com.example.customer_retail_system.system.returns.ReturnStateMachine;
 import com.example.customer_retail_system.system.returns.ReturnStatus;
 import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.CreateReturnRequest;
 import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.ItemDto;
+import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.LabelDto;
 import com.example.customer_retail_system.system.returns.internal.ReturnApiModels.ReturnDto;
 import com.example.customer_retail_system.system.shared.Actor;
 import com.example.customer_retail_system.system.shared.AppProperties;
@@ -45,6 +46,8 @@ public class ReturnService {
 	static final String ORDER_NOT_FOUND_COPY = "We couldn't find an order matching those details.";
 	static final String RETURN_NOT_FOUND_COPY = "We couldn't find that return.";
 	static final String NOT_RETURNABLE_COPY = "Some items in your request can't be returned.";
+	static final String LABEL_INSTRUCTIONS =
+			"Print this label and attach it to the parcel, or show the QR code at the drop-off point.";
 
 	/** Statuses in which the customer may print the label. */
 	static final Set<ReturnStatus> LABEL_AVAILABLE = EnumSet.of(ReturnStatus.APPROVED, ReturnStatus.IN_TRANSIT,
@@ -151,12 +154,57 @@ public class ReturnService {
 		return toDto(ret, orderNumber(ret));
 	}
 
+	@Transactional(readOnly = true)
+	public LabelDto label(CustomerPrincipal principal, String rma) {
+		ReturnRequest ret = requireLabel(load(principal, rma));
+		return new LabelDto(ret.getRmaNumber(), ret.getLabelCode(),
+				"/api/v1/customer/returns/" + ret.getRmaNumber() + "/label/qr.png", LABEL_INSTRUCTIONS);
+	}
+
+	@Transactional(readOnly = true)
+	public byte[] labelQrPng(CustomerPrincipal principal, String rma) {
+		return QrCodes.png(requireLabel(load(principal, rma)).getLabelCode());
+	}
+
+	/** Customer hands the parcel to the carrier: APPROVED → IN_TRANSIT. Repeating it is a no-op. */
+	@Transactional
+	public ReturnDto ship(CustomerPrincipal principal, String rma) {
+		ReturnRequest ret = load(principal, rma);
+		if (ret.getStatus() != ReturnStatus.IN_TRANSIT) {
+			stateMachine.transition(ret, ReturnStatus.IN_TRANSIT, Actor.customer(ret.getCustomerId()),
+					"Customer handed the parcel to the carrier");
+		}
+		return toDto(ret, orderNumber(ret));
+	}
+
+	/** Allowed only before IN_TRANSIT (G11). Repeating it is a no-op. */
+	@Transactional
+	public ReturnDto cancel(CustomerPrincipal principal, String rma) {
+		ReturnRequest ret = load(principal, rma);
+		if (ret.getStatus() != ReturnStatus.CANCELLED) {
+			stateMachine.transition(ret, ReturnStatus.CANCELLED, Actor.customer(ret.getCustomerId()),
+					"Cancelled by customer");
+		}
+		return toDto(ret, orderNumber(ret));
+	}
+
 	// --- helpers --------------------------------------------------------------------------------
 
 	ReturnRequest load(CustomerPrincipal principal, String rma) {
 		return returns.findByRmaNumber(rma)
 				.filter(r -> r.getOrderId() == principal.orderId())
 				.orElseThrow(() -> new DomainException(ErrorCode.RETURN_NOT_FOUND, RETURN_NOT_FOUND_COPY));
+	}
+
+	private static ReturnRequest requireLabel(ReturnRequest ret) {
+		if (!LABEL_AVAILABLE.contains(ret.getStatus())) {
+			String copy = ret.getStatus() == ReturnStatus.REQUESTED || ret.getStatus() == ReturnStatus.PENDING_REVIEW
+					? "Your return label will be available once your return is approved."
+					: "This return no longer has an active label.";
+			throw new DomainException(ErrorCode.INVALID_TRANSITION, copy,
+					Map.of("currentStatus", ret.getStatus().name()));
+		}
+		return ret;
 	}
 
 	String orderNumber(ReturnRequest ret) {
