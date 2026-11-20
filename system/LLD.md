@@ -93,10 +93,23 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
 | customer | GET `/customer/returns/{rma}/label` (JSON) and `/label/qr.png` | |
 | customer | POST `/customer/returns/{rma}/ship`, `/cancel` | 409 INVALID_TRANSITION |
 | warehouse | GET `/warehouse/labels/{labelCode}`; POST `/warehouse/labels/decode` (QR image → code) | 400 LABEL_INVALID |
-| warehouse | POST `/warehouse/returns/{rma}/receive`; POST `/warehouse/returns/{rma}/inspection` {items[{itemId, grade, decision, acceptedQty, note}]} | |
-| finance | GET `/finance/refunds?status=`; POST `/finance/refunds/{id}/approve`, `/reject` {reason}, `/retry`; GET `/finance/ledger?from&to` | |
+| warehouse | GET `/warehouse/returns/{rma}`; POST `/warehouse/returns/{rma}/receive`; POST `/warehouse/returns/{rma}/inspection` {items[{itemId, grade, decision, acceptedQty, note}]} | 404 RETURN_NOT_FOUND |
+| finance | GET `/finance/refunds?status=`; GET `/finance/refunds/{id}` (detail); POST `/finance/refunds/{id}/approve`, `/reject` {reason}, `/retry`; GET `/finance/ledger?from&to` | 404 REFUND_NOT_FOUND |
 | manager | GET `/manager/dashboard?from&to`; GET `/manager/reviews`; POST `/manager/reviews/{rma}/approve`, `/reject`; GET `/manager/audit?entityId=` | |
-| manager | PUT `/admin/gateway/faults` {mode, latencyMs} | non-prod only |
+| manager | GET, PUT `/admin/gateway/faults` {mode, latencyMs} | non-prod only |
+| staff (any role) | GET `/staff/me` → {username, role} | 401 bad credentials; lets the web portal verify a sign-in |
+
+**Web portal support (frontend integration):**
+- `GET /staff/me`: any staff role; the portal calls it with the Basic credentials before storing them.
+- `GET /warehouse/returns/{rma}`: the WarehouseReturnView by RMA (reload after a conflict, typed RMA).
+- `GET /finance/refunds/{id}` → `{refund (RefundView), returnId, rma, orderNumber, returnStatus, flagged,
+  flagReason, requestedAt, items[{itemId, sku, productName, requestedQty, unitPricePaise, reasonCode, reasonText,
+  photoCount, conditionGrade, decision, acceptedQty, refundPaise, inspectionNote}]}`.
+- Customer return items also carry `sku, productName, unitPricePaise, conditionGrade, decision, acceptedQty,
+  refundPaise` (inspection fields null until inspected), and the return carries `totalRefundPaise`.
+- Dashboard categories carry `returnable` (category policy).
+- CORS is off by default (the Vite dev server proxies `/api`); set `app.cors.allowed-origins` (comma-separated)
+  when the portal is served from another origin.
 
 **Customer returns API details (Phase 4):**
 - Create: `Idempotency-Key` is optional (1–100 chars), scoped per order; a replay returns 201 with the
@@ -107,7 +120,8 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
 - Flagging counts the customer's requests with `created_at` in the last `app.flagging.window-days`, status ≠
   CANCELLED, plus the new one; > `app.flagging.max-requests` ⇒ PENDING_REVIEW + `customer_flag` row.
   `flagged` is never exposed to the customer.
-- Return body: `{rma, orderNumber, status, statusLabel, refundMethod, labelCode, createdAt, items[], timeline[]}`.
+- Return body: `{rma, orderNumber, status, statusLabel, refundMethod, labelCode, createdAt, totalRefundPaise,
+  items[], timeline[]}`.
   `labelCode` is null (and `/label`, `/label/qr.png` answer 409) unless status ∈ APPROVED…REFUNDED.
   Label code = `RR-{rma}-{first 8 hex of HMAC-SHA256(app.label.secret, rma)}`; QR is a 300 px PNG, `no-store`.
 - Timeline: six steps Requested, Approved, In transit, Received, Inspected, Refunded, built from the audit
@@ -148,8 +162,8 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
   customer_flag(cleared_at, customer_id), plus audit_log(entity_id), (created_at).
 - Manager reviews: `GET /manager/reviews` → `[{returnId, rma, orderNumber, customerId, requestedAt, itemCount,
   units, refundMethod, flagReason}]`; approve/reject apply only to PENDING_REVIEW (reject needs `{reason}`).
-- Dashboard `GET /manager/dashboard?from&to` → `{returnRateByCategory[{category, soldUnits, returnedUnits,
-  returnRate}], topReasons[{reasonCode, count}], cycleTime{closedReturns, averageHours}, flaggedCustomers[...]}`.
+- Dashboard `GET /manager/dashboard?from&to` → `{returnRateByCategory[{category, returnable, soldUnits,
+  returnedUnits, returnRate}], topReasons[{reasonCode, count}], cycleTime{closedReturns, averageHours}, flaggedCustomers[...]}`.
   Returned units exclude CANCELLED returns; return rate covers orders placed in the range; reasons cover
   returns requested in the range; cycle time covers REFUNDED/REJECTED returns closed in the range; flagged
   customers are all active (uncleared) flags, emails masked.
@@ -159,7 +173,7 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
 
 **Authentication (Phase 3):** customers send `Authorization: Bearer <accessToken>` (token → `shared.CustomerPrincipal(orderId)`;
 any order/return outside that order → 404). Staff use HTTP Basic against `staff_user` (BCrypt), roles map
-`/warehouse/**`→WAREHOUSE, `/finance/**`→FINANCE, `/manager/**`, `/admin/**`→MANAGER. Missing/expired
+`/warehouse/**`→WAREHOUSE, `/finance/**`→FINANCE, `/manager/**`, `/admin/**`→MANAGER, `/staff/**`→any staff role. Missing/expired
 credentials → 401 `UNAUTHORIZED`; wrong role → 403 `FORBIDDEN` (both ProblemDetail). Session lookup limits:
 `app.session.max-attempts` (5) per `app.session.attempt-window` (1 m) per client IP and per order number
 (IP checked first); token TTL `app.session.token-ttl` (2 h).
