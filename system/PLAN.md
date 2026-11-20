@@ -18,8 +18,9 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 - [ ] Verify: review with team (no code) — docs ready; awaiting human team review
 
 ## Phase 2 — Schema & seed data
-- [ ] Flyway V1 core (category, product, customer, order, order_line, staff_user)
-- [ ] JPA entities + repositories (catalog, customer, order)
+- [x] Flyway V1 core (category, product, customer, order, order_line, staff_user)
+  (verified on H2 by tests and on PostgreSQL 17 via `psql -v ON_ERROR_STOP=1`)
+- [x] JPA entities + repositories (catalog, customer, order)
 - [ ] Seed runner (`seed` profile, fixed RNG): 6 categories, 40 products, 500 customers, 2,000 orders, staff users per role
 - [ ] Tests: migration runs on H2; seed counts exact; rerun is a no-op
 
