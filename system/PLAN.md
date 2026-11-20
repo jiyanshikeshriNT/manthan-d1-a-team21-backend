@@ -36,7 +36,7 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 ## Phase 4 — Return requests, state machine, audit, label
 - [x] Flyway V2 (return_request, return_item, return_photo, customer_flag)
   (+ `audit_log` and `rma_number_seq`, needed by Phase 4 audit and RMA numbers)
-- [ ] audit module + AuditLog (same-tx)
+- [x] audit module + AuditLog (same-tx)
 - [ ] ReturnStateMachine + transition-table test (every legal/illegal pair)
 - [ ] Photo storage (magic bytes, size, UUID names)
 - [ ] Create return (order lock, Idempotency-Key replay, flagging, auto-approve vs PENDING_REVIEW)
