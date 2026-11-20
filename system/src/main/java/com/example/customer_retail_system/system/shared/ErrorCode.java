@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
 	ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "Order not found"),
+	RETURN_NOT_FOUND(HttpStatus.NOT_FOUND, "Return not found"),
+	UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication required"),
 	ITEM_NOT_RETURNABLE(HttpStatus.UNPROCESSABLE_CONTENT, "Item not returnable"),
 	VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed"),
 	PHOTO_INVALID(HttpStatus.BAD_REQUEST, "Photo invalid"),

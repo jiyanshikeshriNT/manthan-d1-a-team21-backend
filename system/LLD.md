@@ -24,7 +24,8 @@
   `TIMESTAMP WITH TIME ZONE`; business dates use the injected `Clock` in `app.zone` (Asia/Kolkata).
 
 ## 2. Database schema
-Flyway `V1__core.sql`, `V2__returns.sql`, `V3__refund_ledger_audit.sql`; gateway `V100__gateway.sql`.
+Flyway `V1__core.sql`, `V1_1__customer_access_token.sql` (Phase 3; numbered 1.1 so V2/V3 keep their
+meaning), `V2__returns.sql`, `V3__refund_ledger_audit.sql`; gateway `V100__gateway.sql`.
 
 | Table | Key columns / constraints |
 |---|---|
@@ -89,14 +90,25 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
 | manager | GET `/manager/dashboard?from&to`; GET `/manager/reviews`; POST `/manager/reviews/{rma}/approve`, `/reject`; GET `/manager/audit?entityId=` | |
 | manager | PUT `/admin/gateway/faults` {mode, latencyMs} | non-prod only |
 
-**Error codes:** ORDER_NOT_FOUND 404, ITEM_NOT_RETURNABLE 422, VALIDATION_FAILED 400, PHOTO_INVALID 400, LABEL_INVALID 400, INVALID_TRANSITION 409, CONCURRENT_MODIFICATION 409, RATE_LIMITED 429, FORBIDDEN 403, GATEWAY_PENDING 202.
+**Authentication (Phase 3):** customers send `Authorization: Bearer <accessToken>` (token → `shared.CustomerPrincipal(orderId)`;
+any order/return outside that order → 404). Staff use HTTP Basic against `staff_user` (BCrypt), roles map
+`/warehouse/**`→WAREHOUSE, `/finance/**`→FINANCE, `/manager/**`, `/admin/**`→MANAGER. Missing/expired
+credentials → 401 `UNAUTHORIZED`; wrong role → 403 `FORBIDDEN` (both ProblemDetail). Session lookup limits:
+`app.session.max-attempts` (5) per `app.session.attempt-window` (1 m) per client IP and per order number
+(IP checked first); token TTL `app.session.token-ttl` (2 h).
+
+**Error codes:** ORDER_NOT_FOUND 404, RETURN_NOT_FOUND 404, UNAUTHORIZED 401, ITEM_NOT_RETURNABLE 422, VALIDATION_FAILED 400, PHOTO_INVALID 400, LABEL_INVALID 400, INVALID_TRANSITION 409, CONCURRENT_MODIFICATION 409, RATE_LIMITED 429, FORBIDDEN 403, GATEWAY_PENDING 202.
 
 **Eligibility microcopy:**
 - `CATEGORY_NOT_RETURNABLE`: "For hygiene and safety reasons, {category} items can't be returned."
 - `WINDOW_EXPIRED`: "The {n}-day return window for this item closed on {date}."
 - `NOT_DELIVERED`: "You can start a return once this item is delivered."
 - `ALREADY_IN_RETURN`: "All units of this item are already part of a return."
-- `ELIGIBLE`: "Returnable until {date} ({d} days left)."
+- `ELIGIBLE`: "Returnable until {date} ({d} days left)." — "1 day left" when d = 1, "last day" when d = 0.
+- Dates render as `d MMM yyyy` (e.g. "15 Dec 2026"); `deadline` = delivery date (IST) + window.
+- Per-line eligibility is computed in one place, `order.OrderEligibilityService`, for both the order view
+  and return creation; already-returned units come from the `order.ReturnedQuantities` port (implemented
+  by `returns`).
 
 ## 5. Gateway port (`gateway-api`)
 ```java

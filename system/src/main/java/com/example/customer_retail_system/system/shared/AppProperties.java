@@ -1,5 +1,6 @@
 package com.example.customer_retail_system.system.shared;
 
+import java.time.Duration;
 import java.time.ZoneId;
 
 import jakarta.validation.Valid;
@@ -22,7 +23,15 @@ public record AppProperties(
 		@Valid @NotNull Returns returns,
 		@Valid @NotNull Refund refund,
 		@Valid @NotNull Flagging flagging,
+		@Valid @NotNull Session session,
 		@Valid @NotNull Seed seed) {
+
+	/**
+	 * Customer order lookup (G12): at most {@code maxAttempts} per {@code attemptWindow} per client IP
+	 * and per order number; issued tokens live for {@code tokenTtl}.
+	 */
+	public record Session(@Positive int maxAttempts, @NotNull Duration attemptWindow, @NotNull Duration tokenTtl) {
+	}
 
 	/** Where uploaded photos are stored (server-generated names only). */
 	public record Storage(@NotBlank String dir) {

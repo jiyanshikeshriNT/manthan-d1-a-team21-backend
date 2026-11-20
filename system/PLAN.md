@@ -28,9 +28,10 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 ## Phase 3 — Eligibility & order lookup
 - [x] EligibilityEngine (pure): category, window, delivery, remaining qty → result + microcopy
 - [x] Unit tests: day 0/29/30/31, electronics day 10/11, innerwear, perishables, undelivered, partial qty, IST midnight edge
-- [ ] Customer session: lookup, access token (hashed, TTL), rate limiter
-- [ ] GET order with per-line eligibility
-- [ ] Tests: wrong email → generic 404; 6th attempt → 429; expired token → 401
+- [x] Customer session: lookup, access token (hashed, TTL), rate limiter
+  (+ stateless security chain: bearer tokens for customers, HTTP Basic for staff roles; ProblemDetail 401/403)
+- [x] GET order with per-line eligibility
+- [x] Tests: wrong email → generic 404; 6th attempt → 429; expired token → 401
 
 ## Phase 4 — Return requests, state machine, audit, label
 - [ ] Flyway V2 (return_request, return_item, return_photo, customer_flag)
