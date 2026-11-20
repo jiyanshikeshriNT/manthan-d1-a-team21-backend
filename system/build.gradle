@@ -85,4 +85,6 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// Mirror SystemApplication.main: JVM default zone is UTC; business time uses the injected Clock.
+	systemProperty 'user.timezone', 'UTC'
 }
