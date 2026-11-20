@@ -17,10 +17,6 @@ import com.example.customer_retail_system.system.TestData;
 import com.example.customer_retail_system.system.returns.ReturnStateMachine;
 import com.example.customer_retail_system.system.returns.ReturnStatus;
 import com.example.customer_retail_system.system.shared.Actor;
-import com.google.zxing.BinaryBitmap;
-import com.google.zxing.MultiFormatReader;
-import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
-import com.google.zxing.common.HybridBinarizer;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 
@@ -89,9 +85,7 @@ class ReturnLifecycleIntegrationTest extends ReturnsApiTestBase {
 				.andReturn().getResponse().getContentAsByteArray();
 		var image = ImageIO.read(new ByteArrayInputStream(png));
 		assertThat(image.getWidth()).isEqualTo(QrCodes.SIZE_PX);
-		String decoded = new MultiFormatReader()
-				.decode(new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)))).getText();
-		assertThat(decoded).isEqualTo(labelCode);
+		assertThat(QrCodes.decode(image)).contains(labelCode);
 	}
 
 	@Test
