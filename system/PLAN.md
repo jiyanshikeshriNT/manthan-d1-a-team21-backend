@@ -37,7 +37,7 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 - [x] Flyway V2 (return_request, return_item, return_photo, customer_flag)
   (+ `audit_log` and `rma_number_seq`, needed by Phase 4 audit and RMA numbers)
 - [x] audit module + AuditLog (same-tx)
-- [ ] ReturnStateMachine + transition-table test (every legal/illegal pair)
+- [x] ReturnStateMachine + transition-table test (every legal/illegal pair)
 - [ ] Photo storage (magic bytes, size, UUID names)
 - [ ] Create return (order lock, Idempotency-Key replay, flagging, auto-approve vs PENDING_REVIEW)
 - [ ] Label code HMAC + QR PNG (ZXing); timeline endpoint; ship; cancel
