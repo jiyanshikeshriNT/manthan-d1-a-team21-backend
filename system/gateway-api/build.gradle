@@ -1,0 +1,2 @@
+// Payment gateway port: interfaces and DTOs only. No Spring web, no JPA (see ADR-002).
+description = 'ReturnRight payment gateway port'

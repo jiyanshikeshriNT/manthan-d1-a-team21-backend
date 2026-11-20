@@ -1,0 +1,9 @@
+// Mock payment gateway implementation + Spring auto-configuration (see ADR-002).
+// The portal depends on this module runtimeOnly, so portal code cannot import it.
+description = 'ReturnRight in-process mock payment gateway'
+
+dependencies {
+	api project(':gateway-api')
+	implementation platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
+	implementation 'org.springframework.boot:spring-boot-autoconfigure'
+}

@@ -1,1 +1,3 @@
 rootProject.name = 'system'
+
+include 'gateway-api', 'gateway-mock'
