@@ -34,7 +34,8 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 - [x] Tests: wrong email → generic 404; 6th attempt → 429; expired token → 401
 
 ## Phase 4 — Return requests, state machine, audit, label
-- [ ] Flyway V2 (return_request, return_item, return_photo, customer_flag)
+- [x] Flyway V2 (return_request, return_item, return_photo, customer_flag)
+  (+ `audit_log` and `rma_number_seq`, needed by Phase 4 audit and RMA numbers)
 - [ ] audit module + AuditLog (same-tx)
 - [ ] ReturnStateMachine + transition-table test (every legal/illegal pair)
 - [ ] Photo storage (magic bytes, size, UUID names)
