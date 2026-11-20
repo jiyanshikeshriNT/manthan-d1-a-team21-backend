@@ -27,8 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Starts the app with the {@code seed} profile on its own in-memory database (so seeded rows never
  * leak into other tests) and checks counts, determinism and rerun idempotency.
  */
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:seedtest;MODE=PostgreSQL;"
-		+ "DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
+@SpringBootTest(properties = "spring.datasource.url=jdbc:postgresql://localhost:5432/returnright_seedtest")
 @ActiveProfiles({ "test", "seed" })
 class SeedDataLoaderIntegrationTest {
 

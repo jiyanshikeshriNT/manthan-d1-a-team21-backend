@@ -26,8 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Dashboard numbers on a fixed fixture (October 2026), in its own in-memory database so that no
  * other test's data can change the expected values.
  */
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:dashtest;MODE=PostgreSQL;"
-		+ "DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
+@SpringBootTest(properties = "spring.datasource.url=jdbc:postgresql://localhost:5432/returnright_dashtest")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class DashboardIntegrationTest {

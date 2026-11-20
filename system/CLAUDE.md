@@ -4,7 +4,7 @@
 - $env:JAVA_HOME="C:\Users\Akash Rajpoot\.jdks\jdk-17.0.20.1+1"
 - Build + all tests: `.\gradlew.bat build`
 - Single test: `.\gradlew.bat test --tests "*EligibilityEngineTest"`
-- Run locally (H2 + seed): `.\gradlew.bat bootRun --args="--spring.profiles.active=local,seed"`
+- Run locally (PostgreSQL via scripts/init-local-db.sql + seed): `.\gradlew.bat bootRun --args="--spring.profiles.active=local,seed"`
 - Full stack: `docker compose up --build` (app :8080, postgres :5432, prometheus :9090, grafana :3000)
 - API docs: http://localhost:8080/swagger-ui.html
 
@@ -63,7 +63,7 @@ Terminal: REFUNDED, REJECTED, CANCELLED.
 ## Testing rules
 - Every task ships with tests; `.\gradlew.bat build` must be green before checking a box in
   PLAN.md. Eligibility + refund idempotency changes need boundary/concurrency tests.
-- Unit tests use a fixed `Clock`. Integration tests: `@SpringBootTest` + H2 profile `test`.
+- Unit tests use a fixed `Clock`. Integration tests: `@SpringBootTest` + profile `test` (local PostgreSQL, db returnright_test).
 
 ## Workflow
 - Follow PLAN.md one phase at a time; tick `[x]` only after tests pass; stop at phase end

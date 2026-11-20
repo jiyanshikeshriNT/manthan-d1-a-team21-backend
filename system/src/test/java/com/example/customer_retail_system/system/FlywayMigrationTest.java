@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Flyway V1 applies on H2 (MODE=PostgreSQL) and Hibernate's {@code ddl-auto=validate} accepts
+ * Flyway V1 applies on PostgreSQL and Hibernate's {@code ddl-auto=validate} accepts
  * the entity mappings against it (context start would fail otherwise).
  */
 @DataJpaTest
