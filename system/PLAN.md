@@ -11,11 +11,11 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 - [x] Verify: context-loads test, ModularityTest, `build` green
 
 ## Phase 1 — Architecture docs
-- [ ] docs/architecture.md: C4 context + container diagrams (Mermaid), state machine diagram
-- [ ] docs/adr/ADR-001-refund-idempotency.md (key vs unique refund per return → both)
-- [ ] docs/adr/ADR-002-modular-monolith-gateway.md
-- [ ] docs/state-machine-failure-modes.md (11 failure modes + mitigations)
-- [ ] Verify: review with team (no code)
+- [x] docs/architecture.md: C4 context + container diagrams (Mermaid), state machine diagram
+- [x] docs/adr/ADR-001-refund-idempotency.md (key vs unique refund per return → both)
+- [x] docs/adr/ADR-002-modular-monolith-gateway.md
+- [x] docs/state-machine-failure-modes.md (11 failure modes + mitigations)
+- [ ] Verify: review with team (no code) — docs ready; awaiting human team review
 
 ## Phase 2 — Schema & seed data
 - [ ] Flyway V1 core (category, product, customer, order, order_line, staff_user)
