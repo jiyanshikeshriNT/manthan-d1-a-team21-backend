@@ -51,6 +51,14 @@ meaning), `V2__returns.sql`, `V3__refund_ledger_audit.sql`; gateway `V100__gatew
 `delivered_at >= ordered_at`, `order_line.quantity > 0`, `order_line.unit_price_paise >= 0`,
 `staff_user.role IN (WAREHOUSE, FINANCE, MANAGER)`. Extra indexes: `product(category_id)`, `order_line(order_id)`.
 
+**V2 (as implemented, Phase 4):** also creates `audit_log` (moved here from V3 because every return
+transition is audited from Phase 4; `details` is `VARCHAR(2000)` rather than TEXT so H2 and PostgreSQL map
+it identically) and `rma_number_seq` (RMA numbers `RMA-{n}` from 100001, read with `nextval('rma_number_seq')`).
+`return_item` has UNIQUE(return_id, order_line_id); CHECKs mirror the enums (status, refund_method,
+reason_code DAMAGED/DEFECTIVE/WRONG_ITEM/WRONG_SIZE/NOT_AS_DESCRIBED/CHANGED_MIND/OTHER, grade A/B/C,
+decision ACCEPTED/REJECTED, `0 <= accepted_qty <= requested_qty`, photo type JPEG/PNG and size ≤ 5 MB).
+`client_request_key` stores `{orderId}:{Idempotency-Key}` so keys are scoped per order.
+
 **Seed data set (`seed` profile, `app.seed.random-seed`):** 6 categories (ELECTRONICS 10 days; APPAREL,
 HOME, BEAUTY 30 days; INNERWEAR, PERISHABLES not returnable), 40 products (electronics priced on both sides
 of ₹10,000), 500 customers, 2,000 orders `ORD-100001…ORD-102000` delivered 0–60 days ago (every day
@@ -89,6 +97,27 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
 | finance | GET `/finance/refunds?status=`; POST `/finance/refunds/{id}/approve`, `/reject` {reason}, `/retry`; GET `/finance/ledger?from&to` | |
 | manager | GET `/manager/dashboard?from&to`; GET `/manager/reviews`; POST `/manager/reviews/{rma}/approve`, `/reject`; GET `/manager/audit?entityId=` | |
 | manager | PUT `/admin/gateway/faults` {mode, latencyMs} | non-prod only |
+
+**Customer returns API details (Phase 4):**
+- Create: `Idempotency-Key` is optional (1–100 chars), scoped per order; a replay returns 201 with the
+  original return and header `Idempotent-Replayed: true`. Photo parts `photos_{orderLineId}`, ≤ 3 per item,
+  only for items in the request. `reasonText` is required when `reasonCode` = OTHER.
+- 422 `ITEM_NOT_RETURNABLE` carries `items[{orderLineId, code, message}]` for every refused line; besides the
+  eligibility codes, `QUANTITY_EXCEEDED` = "Only {n} units of this item can be returned." Nothing is created.
+- Flagging counts the customer's requests with `created_at` in the last `app.flagging.window-days`, status ≠
+  CANCELLED, plus the new one; > `app.flagging.max-requests` ⇒ PENDING_REVIEW + `customer_flag` row.
+  `flagged` is never exposed to the customer.
+- Return body: `{rma, orderNumber, status, statusLabel, refundMethod, labelCode, createdAt, items[], timeline[]}`.
+  `labelCode` is null (and `/label`, `/label/qr.png` answer 409) unless status ∈ APPROVED…REFUNDED.
+  Label code = `RR-{rma}-{first 8 hex of HMAC-SHA256(app.label.secret, rma)}`; QR is a 300 px PNG, `no-store`.
+- Timeline: six steps Requested, Approved, In transit, Received, Inspected, Refunded, built from the audit
+  log (`at` = first time each step was reached). PENDING_REVIEW → Requested/current, note "Under review";
+  AWAITING_FINANCE / REFUND_IN_PROGRESS → Inspected/current, notes "Awaiting refund approval" / "Refund
+  processing". REJECTED/CANCELLED → the steps reached, then a final `failed` step with the reason.
+- Ship/cancel repeated in the same target state are no-ops (200, no audit row); illegal moves → 409
+  `INVALID_TRANSITION` with customer copy and `currentStatus`.
+- Audit: `audit.AuditLog.record` is `Propagation.MANDATORY` (same transaction as the change), details are
+  PII-masked (`shared.PiiMasker`), actor = `customer:{id}` / `system` / `staff:{username}`.
 
 **Authentication (Phase 3):** customers send `Authorization: Bearer <accessToken>` (token → `shared.CustomerPrincipal(orderId)`;
 any order/return outside that order → 404). Staff use HTTP Basic against `staff_user` (BCrypt), roles map
