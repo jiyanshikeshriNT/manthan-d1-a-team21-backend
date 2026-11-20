@@ -26,8 +26,8 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
 - [x] Tests: migration runs on H2; seed counts exact; rerun is a no-op
 
 ## Phase 3 — Eligibility & order lookup
-- [ ] EligibilityEngine (pure): category, window, delivery, remaining qty → result + microcopy
-- [ ] Unit tests: day 0/29/30/31, electronics day 10/11, innerwear, perishables, undelivered, partial qty, IST midnight edge
+- [x] EligibilityEngine (pure): category, window, delivery, remaining qty → result + microcopy
+- [x] Unit tests: day 0/29/30/31, electronics day 10/11, innerwear, perishables, undelivered, partial qty, IST midnight edge
 - [ ] Customer session: lookup, access token (hashed, TTL), rate limiter
 - [ ] GET order with per-line eligibility
 - [ ] Tests: wrong email → generic 404; 6th attempt → 429; expired token → 401
