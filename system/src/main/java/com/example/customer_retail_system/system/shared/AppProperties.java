@@ -45,8 +45,19 @@ public record AppProperties(
 	public record Returns(@Positive int defaultWindowDays) {
 	}
 
-	/** Refund totals strictly greater than this need finance approval. */
-	public record Refund(@Positive long approvalThresholdPaise) {
+	/**
+	 * Refund totals strictly greater than {@code approvalThresholdPaise} need finance approval.
+	 * Gateway calls time out after {@code gatewayTimeout}; unknown outcomes are retried with
+	 * exponential backoff from {@code initialBackoff} until {@code maxAttempts}; PENDING/PROCESSING
+	 * refunds untouched for {@code stuckAfter} are picked up by the reconciler.
+	 */
+	public record Refund(
+			@Positive long approvalThresholdPaise,
+			@NotNull Duration gatewayTimeout,
+			@Positive int maxAttempts,
+			@NotNull Duration stuckAfter,
+			@NotNull Duration initialBackoff,
+			boolean reconcilerEnabled) {
 	}
 
 	/** More than {@code maxRequests} return requests within {@code windowDays} flags a customer. */

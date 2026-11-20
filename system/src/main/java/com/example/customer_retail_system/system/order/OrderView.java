@@ -12,6 +12,7 @@ public record OrderView(
 		Instant orderedAt,
 		Instant deliveredAt,
 		String paymentMethod,
+		String paymentRef,
 		List<OrderLineView> lines) {
 
 	public record OrderLineView(long id, long productId, int quantity, long unitPricePaise) {

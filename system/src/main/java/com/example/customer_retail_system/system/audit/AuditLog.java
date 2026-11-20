@@ -40,10 +40,18 @@ public class AuditLog {
 	@Transactional(readOnly = true)
 	public List<AuditRecord> history(String entityType, String entityId) {
 		return repository.findByEntityTypeAndEntityIdOrderByIdAsc(entityType, entityId).stream()
-				.map(e -> new AuditRecord(e.getId(), e.getEntityType(), e.getEntityId(), e.getAction(),
-						e.getFromState(), e.getToState(), e.getActor(), e.getActorRole(), e.getDetails(),
-						e.getCorrelationId(), e.getCreatedAt()))
-				.toList();
+				.map(AuditLog::toRecord).toList();
+	}
+
+	/** Every audit row for an entity id, whatever its type (manager audit query); at most 500. */
+	@Transactional(readOnly = true)
+	public List<AuditRecord> historyForEntityId(String entityId) {
+		return repository.findTop500ByEntityIdOrderByIdAsc(entityId).stream().map(AuditLog::toRecord).toList();
+	}
+
+	private static AuditRecord toRecord(AuditLogEntry e) {
+		return new AuditRecord(e.getId(), e.getEntityType(), e.getEntityId(), e.getAction(), e.getFromState(),
+				e.getToState(), e.getActor(), e.getActorRole(), e.getDetails(), e.getCorrelationId(), e.getCreatedAt());
 	}
 
 	private static String truncate(String details) {

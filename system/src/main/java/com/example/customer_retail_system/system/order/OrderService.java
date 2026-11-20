@@ -48,7 +48,7 @@ public class OrderService {
 
 	private static OrderView toView(CustomerOrder o) {
 		return new OrderView(o.getId(), o.getOrderNumber(), o.getCustomerId(), o.getOrderedAt(), o.getDeliveredAt(),
-				o.getPaymentMethod().name(),
+				o.getPaymentMethod().name(), o.getPaymentRef(),
 				o.getLines().stream()
 						.map(l -> new OrderView.OrderLineView(l.getId(), l.getProductId(), l.getQuantity(),
 								l.getUnitPricePaise()))

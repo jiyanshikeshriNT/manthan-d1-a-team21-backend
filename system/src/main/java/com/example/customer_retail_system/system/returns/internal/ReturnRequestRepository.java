@@ -21,6 +21,14 @@ public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, UU
 
 	Optional<ReturnRequest> findByClientRequestKey(String clientRequestKey);
 
+	@EntityGraph(attributePaths = "items")
+	Optional<ReturnRequest> findWithItemsById(UUID id);
+
+	@EntityGraph(attributePaths = "items")
+	List<ReturnRequest> findByStatusOrderByCreatedAtAsc(ReturnStatus status);
+
+	List<ReturnRequest> findByIdIn(Collection<UUID> ids);
+
 	/** Return requests a customer made after {@code since}, excluding one status (CANCELLED) — G8. */
 	long countByCustomerIdAndCreatedAtAfterAndStatusNot(Long customerId, Instant since, ReturnStatus excluded);
 

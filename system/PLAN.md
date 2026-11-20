@@ -47,23 +47,25 @@ Rule: each task = code + tests + `.\gradlew.bat build` green → tick → commit
   (also verified end-to-end on PostgreSQL 17 with the seeded app: Flyway 1, 1.1, 2; session → create → replay → QR → ship → cancel refused)
 
 ## Phase 5 — Warehouse inspection
-- [ ] Label lookup (HMAC verify) + QR image decode; receive (idempotent re-scan)
-- [ ] Inspection: grade/decision/acceptedQty, refund calc (C = 50%), all-rejected → REJECTED
-- [ ] Tests: grade C rounding, partial accept, wrong-state scan → 409, forged label → 400
+- [x] Label lookup (HMAC verify) + QR image decode; receive (idempotent re-scan)
+- [x] Inspection: grade/decision/acceptedQty, refund calc (C = 50%), all-rejected → REJECTED
+- [x] Tests: grade C rounding, partial accept, wrong-state scan → 409, forged label → 400
+  (testing found a defect: ~1% of label QR codes could not be detected by ZXing; fixed with EC level Q + decode self-check, regression test over 500 labels)
 
 ## Phase 6 — Gateway, refund, finance, ledger
-- [ ] gateway-api port + DTOs; gateway-mock impl (gw_payment, idempotent by key, fault modes, latency)
-- [ ] Flyway V3 (refund, ledger_entry, audit idx)
-- [ ] RefundExecutor (tx1 → gateway → tx2), threshold routing, store credit path
-- [ ] Ledger posting (balanced, unique per refund)
-- [ ] Reconciler (@Scheduled) + finance approve/reject/retry + ledger query
-- [ ] Tests: double approve; 10 concurrent execute calls → 1 gw_payment, 1 ledger pair; TIMEOUT then reconcile → SUCCEEDED once; FAIL_AFTER_CHARGE → no double pay; exactly 10,000 auto vs 10,000.01 needs approval; ledger balances
+- [x] gateway-api port + DTOs; gateway-mock impl (gw_payment, idempotent by key, fault modes, latency)
+- [x] Flyway V3 (refund, ledger_entry, audit idx)
+- [x] RefundExecutor (tx1 → gateway → tx2), threshold routing, store credit path
+- [x] Ledger posting (balanced, unique per refund)
+- [x] Reconciler (@Scheduled) + finance approve/reject/retry + ledger query
+- [x] Tests: double approve; 10 concurrent execute calls → 1 gw_payment, 1 ledger pair; TIMEOUT then reconcile → SUCCEEDED once; FAIL_AFTER_CHARGE → no double pay; exactly 10,000 auto vs 10,000.01 needs approval; ledger balances
+  (+ outage → max attempts → FAILED → finance retry, decline, crash-stuck PROCESSING rescued, no gateway call inside a tx; end-to-end on PostgreSQL 17)
 
 ## Phase 7 — Manager
-- [ ] Review queue approve/reject for PENDING_REVIEW
-- [ ] Dashboard queries: return rate by category, top reasons, avg cycle time, flagged customers
-- [ ] Audit query endpoint; gateway fault admin endpoint
-- [ ] Tests: dashboard numbers on a fixed fixture; role access matrix (403s)
+- [x] Review queue approve/reject for PENDING_REVIEW
+- [x] Dashboard queries: return rate by category, top reasons, avg cycle time, flagged customers
+- [x] Audit query endpoint; gateway fault admin endpoint
+- [x] Tests: dashboard numbers on a fixed fixture; role access matrix (403s)
 
 ## Phase 8 — Testing deliverables
 - [ ] docs/testing/e2e-cases.md: 10 written E2E cases (happy path, flagged, grade C, mixed basket, >10k approval, finance reject, double click refund, gateway timeout, cancel after ship refused, forged label)

@@ -100,6 +100,14 @@ public class ReturnRequest {
 		return item;
 	}
 
+	/** Total refund after grading (sum of item refunds), set at inspection. */
+	public void recordTotalRefund(long totalRefundPaise) {
+		if (totalRefundPaise < 0) {
+			throw new IllegalArgumentException("total refund must be >= 0");
+		}
+		this.totalRefundPaise = totalRefundPaise;
+	}
+
 	/** Only {@link ReturnStateMachine} calls this. */
 	void changeStatus(ReturnStatus target, Instant at) {
 		this.status = target;

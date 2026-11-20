@@ -119,6 +119,44 @@ present, so 10/11 and 30/31 boundaries exist; every 25th order undelivered), sta
 - Audit: `audit.AuditLog.record` is `Propagation.MANDATORY` (same transaction as the change), details are
   PII-masked (`shared.PiiMasker`), actor = `customer:{id}` / `system` / `staff:{username}`.
 
+**Warehouse, refund, finance and manager details (Phases 5–7):**
+- `POST /warehouse/returns/{rma}/receive` accepts an optional body `{labelCode}`; if given it must verify and
+  belong to `{rma}` (400 `LABEL_INVALID` otherwise). Re-scanning a RECEIVED return is a no-op.
+- `POST /warehouse/labels/decode` takes multipart part `image` and returns `{labelCode, rma}`.
+- Inspection must cover every item exactly once; `acceptedQty` defaults to the requested quantity for
+  ACCEPTED and must be 0/absent for REJECTED. Item refund = `Money.percentOf(unitPrice × acceptedQty, grade%)`.
+  Responses include the item verdicts, `totalRefundPaise` and the `refund` (RefundView) once created.
+- The inspection commits first; an auto-approved refund is executed afterwards, outside any transaction
+  (`RefundExecutor` refuses to run inside one). Finance approve/retry do the same.
+- Refund statuses PENDING → PROCESSING → SUCCEEDED | UNKNOWN | FAILED; AWAITING_APPROVAL → PENDING (approve)
+  | REJECTED. Finance retry: FAILED → PENDING (attempt counter reset, same key); UNKNOWN/PENDING executed as is.
+  Approve/reject: repeat of the same decision is a no-op; the losing one of a race gets 409 with `currentStatus`.
+- Reconciler (`app.refund.reconcile-interval-ms`, off in tests) handles UNKNOWN when `next_attempt_at` is due,
+  and PENDING/PROCESSING untouched for `app.refund.stuck-after` (2 m). It asks `status(key)` first; failed
+  status checks also count as attempts (backoff `app.refund.initial-backoff` × 2^(n−1), max 10 min); after
+  `app.refund.max-attempts` (5) the refund is FAILED. Gateway timeout `app.refund.gateway-timeout` (3 s).
+- Audit rows for refunds use entity type `REFUND` and the refund id; gateway fault changes use `GATEWAY/faults`.
+- `GET /finance/refunds?status=` (all when omitted); `GET /finance/ledger?from&to` → `{entries, totalDebitPaise,
+  totalCreditPaise, balanced}`; dates are inclusive in Asia/Kolkata, default the last 30 days, max 366 days.
+  Unknown refund id → 404 `REFUND_NOT_FOUND`.
+- Gateway port also defines an optional `GatewayFaultControl` (implemented only by the mock) so the non-prod
+  `GET/PUT /admin/gateway/faults` endpoint and tests never import mock classes. Fault modes: NONE, FAIL,
+  TIMEOUT, SLOW, FAIL_AFTER_CHARGE and **DECLINE** (added to exercise the definite-decline path).
+- `gw_payment` comes from `db/migration/gateway/V100__gateway.sql`, found by the portal's recursive Flyway scan;
+  `spring.flyway.out-of-order=true` lets future portal versions (V4+) apply after V100.
+- V3 also adds the dashboard indexes: customer_order(ordered_at), return_request(created_at), (closed_at),
+  customer_flag(cleared_at, customer_id), plus audit_log(entity_id), (created_at).
+- Manager reviews: `GET /manager/reviews` → `[{returnId, rma, orderNumber, customerId, requestedAt, itemCount,
+  units, refundMethod, flagReason}]`; approve/reject apply only to PENDING_REVIEW (reject needs `{reason}`).
+- Dashboard `GET /manager/dashboard?from&to` → `{returnRateByCategory[{category, soldUnits, returnedUnits,
+  returnRate}], topReasons[{reasonCode, count}], cycleTime{closedReturns, averageHours}, flaggedCustomers[...]}`.
+  Returned units exclude CANCELLED returns; return rate covers orders placed in the range; reasons cover
+  returns requested in the range; cycle time covers REFUNDED/REJECTED returns closed in the range; flagged
+  customers are all active (uncleared) flags, emails masked.
+- `GET /manager/audit?entityId=` returns up to 500 rows for a return UUID or refund id, oldest first.
+- Label QR codes are rendered at error-correction level Q and decoded once before being issued (fallback H):
+  testing showed ~1% of symbols at a fixed level could not be detected by ZXing.
+
 **Authentication (Phase 3):** customers send `Authorization: Bearer <accessToken>` (token → `shared.CustomerPrincipal(orderId)`;
 any order/return outside that order → 404). Staff use HTTP Basic against `staff_user` (BCrypt), roles map
 `/warehouse/**`→WAREHOUSE, `/finance/**`→FINANCE, `/manager/**`, `/admin/**`→MANAGER. Missing/expired
@@ -126,7 +164,7 @@ credentials → 401 `UNAUTHORIZED`; wrong role → 403 `FORBIDDEN` (both Problem
 `app.session.max-attempts` (5) per `app.session.attempt-window` (1 m) per client IP and per order number
 (IP checked first); token TTL `app.session.token-ttl` (2 h).
 
-**Error codes:** ORDER_NOT_FOUND 404, RETURN_NOT_FOUND 404, UNAUTHORIZED 401, ITEM_NOT_RETURNABLE 422, VALIDATION_FAILED 400, PHOTO_INVALID 400, LABEL_INVALID 400, INVALID_TRANSITION 409, CONCURRENT_MODIFICATION 409, RATE_LIMITED 429, FORBIDDEN 403, GATEWAY_PENDING 202.
+**Error codes:** ORDER_NOT_FOUND 404, RETURN_NOT_FOUND 404, REFUND_NOT_FOUND 404, UNAUTHORIZED 401, ITEM_NOT_RETURNABLE 422, VALIDATION_FAILED 400, PHOTO_INVALID 400, LABEL_INVALID 400, INVALID_TRANSITION 409, CONCURRENT_MODIFICATION 409, RATE_LIMITED 429, FORBIDDEN 403, GATEWAY_PENDING 202.
 
 **Eligibility microcopy:**
 - `CATEGORY_NOT_RETURNABLE`: "For hygiene and safety reasons, {category} items can't be returned."

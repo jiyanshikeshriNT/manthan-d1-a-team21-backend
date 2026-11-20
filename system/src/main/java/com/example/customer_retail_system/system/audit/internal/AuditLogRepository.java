@@ -15,4 +15,6 @@ public interface AuditLogRepository extends Repository<AuditLogEntry, Long> {
 	List<AuditLogEntry> findByEntityTypeAndEntityIdOrderByIdAsc(String entityType, String entityId);
 
 	long countByEntityTypeAndEntityId(String entityType, String entityId);
+
+	List<AuditLogEntry> findTop500ByEntityIdOrderByIdAsc(String entityId);
 }

@@ -76,6 +76,24 @@ public class ReturnItem {
 		this.reasonText = reasonText;
 	}
 
+	/**
+	 * Records the warehouse's verdict. {@code acceptedQty} must be 0 for a rejection and
+	 * 1..requestedQty for an acceptance; {@code refundPaise} is computed by the caller.
+	 */
+	public void recordInspection(ConditionGrade grade, InspectionDecision decision, int acceptedQty, long refundPaise,
+			String note) {
+		boolean valid = decision == InspectionDecision.REJECTED ? acceptedQty == 0
+				: acceptedQty >= 1 && acceptedQty <= requestedQty;
+		if (!valid || refundPaise < 0) {
+			throw new IllegalArgumentException("Invalid inspection for item " + id);
+		}
+		this.conditionGrade = grade.name();
+		this.decision = decision.name();
+		this.acceptedQty = acceptedQty;
+		this.refundPaise = refundPaise;
+		this.inspectionNote = note;
+	}
+
 	public ReturnPhoto addPhoto(String storedName, String contentType, long sizeBytes) {
 		ReturnPhoto photo = new ReturnPhoto(this, storedName, contentType, sizeBytes);
 		photos.add(photo);
