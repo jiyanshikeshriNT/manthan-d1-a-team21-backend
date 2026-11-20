@@ -1,0 +1,98 @@
+# ReturnRight — Low-Level Design
+
+## 1. Containers and modules
+- **Containers (Compose):** `app` (Spring Boot portal plus in-process gateway-mock), `postgres:17`, `prometheus`, `grafana`. Photos are stored in a volume mounted at `/data/photos`.
+- **Gradle:** root `system` (portal, bootJar), `gateway-api` (java-library), `gateway-mock` (java-library with Spring auto-configuration, own `gw_` tables, own Flyway location `classpath:db/migration/gateway`).
+- **Portal modules** (packages under `com.example.customer_retail_system.system`):
+  - `catalog`: categories and products.
+  - `customer`: customers and flags.
+  - `order`: order lookup.
+  - `eligibility`: pure rules engine.
+  - `returns`: aggregate, state machine, label/QR, photos.
+  - `inspection`: warehouse actions.
+  - `refund`: orchestration, reconciler, finance actions.
+  - `ledger`: double-entry ledger.
+  - `audit`: append-only log.
+  - `dashboard`: read models.
+  - `security`: staff auth, customer tokens, rate limiter.
+  - `shared`: errors, Clock, money.
+
+## 2. Database schema
+Flyway `V1__core.sql`, `V2__returns.sql`, `V3__refund_ledger_audit.sql`; gateway `V100__gateway.sql`.
+
+| Table | Key columns / constraints |
+|---|---|
+| `category` | id PK, code UNIQUE, name, returnable BOOL, return_window_days INT NULL |
+| `product` | id PK, sku UNIQUE, name, category_id FK, price_paise BIGINT |
+| `customer` | id PK, email UNIQUE (stored lower-case), name, phone, created_at |
+| `customer_order` | id PK, order_number UNIQUE, customer_id FK, ordered_at, delivered_at NULL, payment_method, payment_ref, version; IDX(customer_id) |
+| `order_line` | id PK, order_id FK, product_id FK, quantity INT, unit_price_paise BIGINT |
+| `customer_access_token` | token_hash PK (SHA-256), order_id FK, expires_at |
+| `staff_user` | id PK, username UNIQUE, password_hash, role |
+| `return_request` | id UUID PK, rma_number UNIQUE, order_id FK, customer_id FK, status, refund_method, flagged BOOL, label_code UNIQUE, client_request_key UNIQUE NULL (Idempotency-Key header), total_refund_paise BIGINT NULL, created_at, updated_at, closed_at, version; IDX(customer_id, created_at), IDX(status) |
+| `return_item` | id PK, return_id FK, order_line_id FK, requested_qty, reason_code, reason_text, condition_grade NULL, decision NULL, accepted_qty NULL, refund_paise NULL, inspection_note |
+| `return_photo` | id PK, return_item_id FK, stored_name UNIQUE, content_type, size_bytes |
+| `customer_flag` | id PK, customer_id FK, return_id FK, return_count, flagged_at, cleared_at NULL, cleared_by |
+| `refund` | id PK, return_id UNIQUE FK, amount_paise, method, status (PENDING, AWAITING_APPROVAL, PROCESSING, UNKNOWN, SUCCEEDED, FAILED, REJECTED), idempotency_key UNIQUE, gateway_txn_id, attempts, requires_approval, approved_by, approved_at, last_error, next_attempt_at, created_at, updated_at, version |
+| `ledger_entry` | id PK, refund_id FK, customer_id, account (REFUND_EXPENSE, GATEWAY_CLEARING, STORE_CREDIT_LIABILITY), direction (DEBIT/CREDIT), amount_paise > 0, created_at; UNIQUE(refund_id, account, direction) |
+| `audit_log` | id PK, entity_type, entity_id, action, from_state, to_state, actor, actor_role, details TEXT, correlation_id, created_at; IDX(entity_type, entity_id) |
+| `gw_payment` (gateway module) | id PK, idempotency_key UNIQUE, amount_paise, reference, status, txn_id, created_at |
+
+**Ledger postings per refund (balanced):**
+- Original payment: DEBIT REFUND_EXPENSE / CREDIT GATEWAY_CLEARING.
+- Store credit: DEBIT REFUND_EXPENSE / CREDIT STORE_CREDIT_LIABILITY (keyed by customer).
+
+## 3. Core flows
+1. **Lookup:** `POST /customer/session` checks the rate limit, matches order number and lower-cased email, and returns a token. Any miss returns 404 `ORDER_NOT_FOUND` with generic copy.
+2. **Create return:** multipart request + photos with an `Idempotency-Key` header. Lock the order, run eligibility per line (fail the whole request if any selected line is ineligible, listing the reasons), store photos, compute the flag, insert the return in REQUESTED, then transition to APPROVED or PENDING_REVIEW. Generate the label code and HMAC. Audit runs in the same transaction. Replaying the same key returns the original response.
+3. **Ship:** APPROVED → IN_TRANSIT.
+4. **Warehouse:** look up the return by label (verify HMAC), RECEIVED, then inspection (per-item grade, decision and acceptedQty) → INSPECTED. Compute item refunds and the total. If total = 0, go to REJECTED. Otherwise create the refund: total > 10k → AWAITING_FINANCE (refund AWAITING_APPROVAL), else → REFUND_IN_PROGRESS and execute.
+5. **Refund execution (RefundExecutor):**
+   - tx1: `UPDATE refund SET status='PROCESSING', attempts=attempts+1 WHERE id=? AND status IN ('PENDING','UNKNOWN')`. If 0 rows are updated, return the current state with no gateway call.
+   - Outside any transaction: `gateway.pay(key, amount, ref)` with a 3 s timeout.
+   - tx2 on success: refund SUCCEEDED, ledger pair, return REFUNDED, closed_at, audit, metrics.
+   - On timeout or 5xx: UNKNOWN with `next_attempt_at` set by backoff.
+   - On a definite decline: FAILED, then alert and audit.
+6. **Reconciler (`@Scheduled` every 30 s):** picks refunds in UNKNOWN, or PROCESSING for more than 2 min. It calls `gateway.status(key)`: found leads to SUCCEEDED, not found re-runs `pay` with the same key. After 5 attempts the refund goes to FAILED, and finance can retry it manually with the same key.
+7. **Finance:** approve leads to execution. Reject (reason required) sets refund REJECTED and the return REJECTED. Both use conditional updates, so a double approval is a no-op that returns the current state.
+
+## 4. API contracts (`/api/v1`, JSON, errors as ProblemDetail + `code`)
+| Role | Method & path | Notes |
+|---|---|---|
+| public | POST `/customer/session` {orderNumber,email} → {accessToken,expiresAt} | 429 RATE_LIMITED, 404 ORDER_NOT_FOUND |
+| customer | GET `/customer/orders/{orderNumber}` → lines + `eligibility{eligible, code, message, returnableQty, deadline}` | |
+| customer | POST `/customer/returns` multipart(`request` JSON {orderNumber, refundMethod, items[{orderLineId, qty, reasonCode, reasonText}]}, `photos_{orderLineId}`) → 201 {rma, status, labelCode, timeline} | 422 ITEM_NOT_RETURNABLE (per-item reasons), 400 PHOTO_INVALID |
+| customer | GET `/customer/returns/{rma}` → status + timeline[{step, state: done/current/pending/failed, at}] | |
+| customer | GET `/customer/returns/{rma}/label` (JSON) and `/label/qr.png` | |
+| customer | POST `/customer/returns/{rma}/ship`, `/cancel` | 409 INVALID_TRANSITION |
+| warehouse | GET `/warehouse/labels/{labelCode}`; POST `/warehouse/labels/decode` (QR image → code) | 400 LABEL_INVALID |
+| warehouse | POST `/warehouse/returns/{rma}/receive`; POST `/warehouse/returns/{rma}/inspection` {items[{itemId, grade, decision, acceptedQty, note}]} | |
+| finance | GET `/finance/refunds?status=`; POST `/finance/refunds/{id}/approve`, `/reject` {reason}, `/retry`; GET `/finance/ledger?from&to` | |
+| manager | GET `/manager/dashboard?from&to`; GET `/manager/reviews`; POST `/manager/reviews/{rma}/approve`, `/reject`; GET `/manager/audit?entityId=` | |
+| manager | PUT `/admin/gateway/faults` {mode, latencyMs} | non-prod only |
+
+**Error codes:** ORDER_NOT_FOUND 404, ITEM_NOT_RETURNABLE 422, VALIDATION_FAILED 400, PHOTO_INVALID 400, LABEL_INVALID 400, INVALID_TRANSITION 409, CONCURRENT_MODIFICATION 409, RATE_LIMITED 429, FORBIDDEN 403, GATEWAY_PENDING 202.
+
+**Eligibility microcopy:**
+- `CATEGORY_NOT_RETURNABLE`: "For hygiene and safety reasons, {category} items can't be returned."
+- `WINDOW_EXPIRED`: "The {n}-day return window for this item closed on {date}."
+- `NOT_DELIVERED`: "You can start a return once this item is delivered."
+- `ALREADY_IN_RETURN`: "All units of this item are already part of a return."
+- `ELIGIBLE`: "Returnable until {date} ({d} days left)."
+
+## 5. Gateway port (`gateway-api`)
+```java
+public interface PaymentGateway {
+  PaymentResult pay(PaymentRequest req);            // idempotent by req.idempotencyKey()
+  Optional<PaymentResult> status(String idempotencyKey);
+}
+```
+`gateway-mock` persists results by key, so a repeated key returns the original txn and never charges twice. Fault injection and simulated latency live here.
+
+## 6. Observability
+Micrometer metrics:
+- `returnright_refund_total{outcome=success|failure|unknown}`
+- `returnright_gateway_latency` (Timer, with percentiles)
+- `returnright_refund_pending` (gauge)
+
+Exposed at `/actuator/prometheus`. Grafana gets a provisioned dashboard. Prometheus has alert rules for success rate < 95% over 5 m and gateway p95 > 2 s over 5 m.
