@@ -14,4 +14,9 @@ class ReturnsConfig {
 	PhotoStorage photoStorage(AppProperties properties) {
 		return new PhotoStorage(Path.of(properties.storage().dir()));
 	}
+
+	@Bean
+	LabelCodec labelCodec(AppProperties properties) {
+		return new LabelCodec(properties.label().secret());
+	}
 }
