@@ -28,10 +28,12 @@ class FinanceController {
 
 	private final FinanceService finance;
 	private final RefundExecutor executor;
+	private final FinanceRefundDetails details;
 
-	FinanceController(FinanceService finance, RefundExecutor executor) {
+	FinanceController(FinanceService finance, RefundExecutor executor, FinanceRefundDetails details) {
 		this.finance = finance;
 		this.executor = executor;
+		this.details = details;
 	}
 
 	record RejectRequest(@NotBlank @Size(max = 500) String reason) {
@@ -40,6 +42,12 @@ class FinanceController {
 	@GetMapping("/refunds")
 	List<RefundView> refunds(@RequestParam(required = false) RefundStatus status) {
 		return finance.list(status);
+	}
+
+	/** The refund with the inspected return behind it (graded items, flag), for the review drawer. */
+	@GetMapping("/refunds/{id}")
+	FinanceRefundDetails.Detail refund(@PathVariable long id) {
+		return details.detail(id);
 	}
 
 	/** Approving twice is a no-op that returns the current state (no second payment). */

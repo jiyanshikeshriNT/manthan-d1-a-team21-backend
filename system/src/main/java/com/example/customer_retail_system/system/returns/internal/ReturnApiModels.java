@@ -41,12 +41,19 @@ final class ReturnApiModels {
 			/** Null until the return is approved (no label to print while under review). */
 			String labelCode,
 			Instant createdAt,
+			/** Sum of the per-item refunds; null until the return has been inspected. */
+			Long totalRefundPaise,
 			List<ItemDto> items,
 			List<Timeline.Entry> timeline) {
 	}
 
-	record ItemDto(long returnItemId, long orderLineId, int quantity, String reasonCode, String reasonText,
-			int photoCount) {
+	/**
+	 * One returned item. Inspection fields ({@code conditionGrade}, {@code decision}, {@code acceptedQty},
+	 * {@code refundPaise}) stay null until the warehouse has inspected the return.
+	 */
+	record ItemDto(long returnItemId, long orderLineId, String sku, String productName, long unitPricePaise,
+			int quantity, String reasonCode, String reasonText, int photoCount, String conditionGrade,
+			String decision, Integer acceptedQty, Long refundPaise) {
 	}
 
 	record LabelDto(String rma, String labelCode, String qrCodeUrl, String instructions) {

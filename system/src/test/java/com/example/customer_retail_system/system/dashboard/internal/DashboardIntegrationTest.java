@@ -106,6 +106,7 @@ class DashboardIntegrationTest {
 				// Return rate: Apparel 2 of 4 (R1 + R2; cancelled R3 and the September order excluded), Home 2 of 2, Beauty 0 of 5.
 				.andExpect(jsonPath("$.returnRateByCategory.length()").value(3))
 				.andExpect(jsonPath("$.returnRateByCategory[0].category").value("Apparel"))
+				.andExpect(jsonPath("$.returnRateByCategory[0].returnable").value(true))
 				.andExpect(jsonPath("$.returnRateByCategory[0].soldUnits").value(4))
 				.andExpect(jsonPath("$.returnRateByCategory[0].returnedUnits").value(2))
 				.andExpect(jsonPath("$.returnRateByCategory[0].returnRate").value(0.5))

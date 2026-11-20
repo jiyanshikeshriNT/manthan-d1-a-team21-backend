@@ -12,7 +12,8 @@ final class DashboardModels {
 	}
 
 	/** {@code returnRate} = returnedUnits ÷ soldUnits (0..1, 4 dp) for orders placed in the range. */
-	record CategoryReturnRate(String category, long soldUnits, long returnedUnits, BigDecimal returnRate) {
+	record CategoryReturnRate(String category, boolean returnable, long soldUnits, long returnedUnits,
+			BigDecimal returnRate) {
 	}
 
 	record ReasonCount(String reasonCode, long count) {

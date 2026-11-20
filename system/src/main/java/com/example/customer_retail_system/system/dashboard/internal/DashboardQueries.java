@@ -45,7 +45,8 @@ class DashboardQueries {
 	/** Returned units (in returns that were not cancelled) ÷ sold units, for orders placed in the range. */
 	List<CategoryReturnRate> returnRateByCategory(DateRange range) {
 		return jdbc.query("""
-				SELECT k.name AS category, SUM(l.quantity) AS sold, COALESCE(SUM(rq.qty), 0) AS returned
+				SELECT k.name AS category, k.returnable AS returnable, SUM(l.quantity) AS sold,
+				       COALESCE(SUM(rq.qty), 0) AS returned
 				FROM order_line l
 				JOIN customer_order o ON o.id = l.order_id
 				JOIN product p ON p.id = l.product_id
@@ -55,14 +56,15 @@ class DashboardQueries {
 				           WHERE r.status <> 'CANCELLED'
 				           GROUP BY i.order_line_id) rq ON rq.order_line_id = l.id
 				WHERE o.ordered_at >= ? AND o.ordered_at < ?
-				GROUP BY k.name
+				GROUP BY k.name, k.returnable
 				ORDER BY k.name""",
 				(rs, i) -> {
 					long sold = rs.getLong("sold");
 					long returned = rs.getLong("returned");
 					BigDecimal rate = sold == 0 ? BigDecimal.ZERO.setScale(4)
 							: BigDecimal.valueOf(returned).divide(BigDecimal.valueOf(sold), 4, RoundingMode.HALF_UP);
-					return new CategoryReturnRate(rs.getString("category"), sold, returned, rate);
+					return new CategoryReturnRate(rs.getString("category"), rs.getBoolean("returnable"), sold, returned,
+							rate);
 				},
 				utc(range.start()), utc(range.endExclusive()));
 	}

@@ -15,6 +15,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.example.customer_retail_system.system.audit.AuditLog;
+import com.example.customer_retail_system.system.catalog.CatalogService;
+import com.example.customer_retail_system.system.catalog.ProductInfo;
 import com.example.customer_retail_system.system.customer.CustomerService;
 import com.example.customer_retail_system.system.order.OrderEligibilityService;
 import com.example.customer_retail_system.system.order.OrderEligibilityService.LineEligibility;
@@ -65,10 +67,13 @@ public class ReturnService {
 	private final RmaNumberGenerator rmaNumbers;
 	private final Clock clock;
 	private final AppProperties properties;
+	private final CatalogService catalog;
 
 	ReturnService(ReturnRequestRepository returns, OrderService orders, OrderEligibilityService eligibility,
 			CustomerService customers, ReturnStateMachine stateMachine, AuditLog auditLog, PhotoStorage photos,
-			LabelCodec labels, RmaNumberGenerator rmaNumbers, Clock clock, AppProperties properties) {
+			LabelCodec labels, RmaNumberGenerator rmaNumbers, Clock clock, AppProperties properties,
+			CatalogService catalog) {
+		this.catalog = catalog;
 		this.returns = returns;
 		this.orders = orders;
 		this.eligibility = eligibility;
@@ -213,14 +218,24 @@ public class ReturnService {
 
 	ReturnDto toDto(ReturnRequest ret, String orderNumber) {
 		var history = auditLog.history(ReturnStateMachine.AUDIT_ENTITY_TYPE, ret.getId().toString());
-		List<ItemDto> items = ret.getItems().stream()
-				.map(i -> new ItemDto(i.getId(), i.getOrderLineId(), i.getRequestedQty(), i.getReasonCode().name(),
-						i.getReasonText(), i.getPhotos().size()))
-				.toList();
+		Map<Long, OrderView.OrderLineView> lines = orders.findById(ret.getOrderId())
+				.map(o -> o.lines().stream()
+						.collect(Collectors.toMap(OrderView.OrderLineView::id, Function.identity())))
+				.orElse(Map.of());
+		Map<Long, ProductInfo> products = catalog
+				.findProducts(lines.values().stream().map(OrderView.OrderLineView::productId).toList());
+		List<ItemDto> items = ret.getItems().stream().map(i -> {
+			OrderView.OrderLineView line = lines.get(i.getOrderLineId());
+			ProductInfo product = line == null ? null : products.get(line.productId());
+			return new ItemDto(i.getId(), i.getOrderLineId(), product == null ? null : product.sku(),
+					product == null ? null : product.name(), line == null ? 0 : line.unitPricePaise(),
+					i.getRequestedQty(), i.getReasonCode().name(), i.getReasonText(), i.getPhotos().size(),
+					i.getConditionGrade(), i.getDecision(), i.getAcceptedQty(), i.getRefundPaise());
+		}).toList();
 		return new ReturnDto(ret.getRmaNumber(), orderNumber, ret.getStatus().name(),
 				Timeline.statusLabel(ret.getStatus()), ret.getRefundMethod().name(),
-				LABEL_AVAILABLE.contains(ret.getStatus()) ? ret.getLabelCode() : null, ret.getCreatedAt(), items,
-				Timeline.build(ret.getStatus(), history));
+				LABEL_AVAILABLE.contains(ret.getStatus()) ? ret.getLabelCode() : null, ret.getCreatedAt(),
+				ret.getTotalRefundPaise(), items, Timeline.build(ret.getStatus(), history));
 	}
 
 	private static String clientKey(long orderId, String idempotencyKey) {

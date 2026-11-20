@@ -55,6 +55,12 @@ class WarehouseController {
 		return new DecodedLabel(labelCode, returns.rmaFromLabel(labelCode));
 	}
 
+	/** Current state of a return by RMA (used to reload after a conflict, or when the RMA is typed in). */
+	@GetMapping("/returns/{rma}")
+	WarehouseReturnView byRma(@PathVariable String rma) {
+		return inspections.byRma(rma);
+	}
+
 	/** IN_TRANSIT → RECEIVED; re-scanning a received parcel is a no-op. Optional body {@code {labelCode}}. */
 	@PostMapping("/returns/{rma}/receive")
 	WarehouseReturnView receive(@PathVariable String rma, @Valid @RequestBody(required = false) ReceiveRequest body,
